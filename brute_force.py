@@ -2,10 +2,20 @@ import ecdsa
 import hashlib
 import base58
 import requests
-import random
 import os
 import json
-from Crypto.Hash import RIPEMD160  # Import RIPEMD160 from pycryptodome
+import logging
+from telegram import Bot
+from Crypto.Hash import RIPEMD160
+
+# Logging setup
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Telegram Bot Config
+TELEGRAM_BOT_TOKEN = "7413053009:"
+TELEGRAM_CHAT_ID = "7615664261"
+
+bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 # Define key search range (default values)
 DEFAULT_START_RANGE = int("8000000000000000000000000000000000000000000000000000000000000000", 16)
@@ -16,9 +26,17 @@ PROGRESS_FILE = "./progress.txt"
 FOUND_FILE = "./found/found_keys.txt"
 PUZZLE_ADDRESSES_FILE = "./target_addresses.json"
 
-# Load puzzle addresses from JSON file
+# Load puzzle addresses
 with open(PUZZLE_ADDRESSES_FILE, "r") as f:
     PUZZLE_ADDRESSES = json.load(f)
+
+def send_telegram_message(message):
+    """Send a message to the Telegram bot."""
+    try:
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        logging.info("✅ Telegram message sent successfully.")
+    except Exception as e:
+        logging.error(f"❌ Failed to send Telegram message: {e}")
 
 def private_key_to_wif(private_key_hex):
     """Convert a private key to Wallet Import Format (WIF)."""
@@ -35,8 +53,6 @@ def private_key_to_address(private_key_hex):
     pubkey = key.verifying_key.to_string()
 
     sha256_bpk = hashlib.sha256(b'\x04' + pubkey).digest()
-
-    # Use pycryptodome's RIPEMD160 instead of hashlib
     ripemd160_bpk = RIPEMD160.new(sha256_bpk).digest()
 
     network_byte = b'\x00' + ripemd160_bpk
@@ -58,10 +74,10 @@ def get_balance(addr):
         balance = funded_txo_sum - spent_txo_sum
         return [balance, funded_txo_sum, spent_txo_sum]
     except requests.exceptions.RequestException as error:
-        print(f"Error fetching balance for address {addr}: {error}")
+        logging.error(f"Error fetching balance for address {addr}: {error}")
         return [0, 0, 0]
     except KeyError as error:
-        print(f"Error parsing balance data for address {addr}: {error}")
+        logging.error(f"Error parsing balance data for address {addr}: {error}")
         return [0, 0, 0]
 
 def save_progress(last_key):
@@ -88,12 +104,17 @@ def brute_force():
         address = private_key_to_address(private_key)
         balance, _, _ = get_balance(address)
 
-        print(f"Checking: {private_key} -> {address} | Balance: {balance}")
+        if attempts % 10000 == 0:
+            logging.info(f"Checking: {private_key} -> {address} | Balance: {balance}")
 
         if address in PUZZLE_ADDRESSES or balance > 0:
-            print(f"🎉 MATCH FOUND! Private Key: {private_key} -> Address: {address} (Balance: {balance})")
+            message = f"🎉 MATCH FOUND! \nPrivate Key: {private_key}\nAddress: {address}\nBalance: {balance} satoshis"
+            logging.info(message)
+
             with open(FOUND_FILE, "a") as f:
                 f.write(f"{private_key} -> {address} | Balance: {balance}\n")
+
+            send_telegram_message(message)
 
         # Save progress every 1000 attempts
         if attempts % 1000 == 0:
@@ -103,4 +124,3 @@ def brute_force():
         current_key += 1
 
 brute_force()
-
