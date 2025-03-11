@@ -1,0 +1,6 @@
+ecdsa
+hashlib
+base58
+requests
+pycryptodome
+bitcoinlib
