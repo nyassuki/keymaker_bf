@@ -84,7 +84,10 @@ def run_puzzle():
         address = generate_address(private_key)
         balance = 0  # Set balance to 0 to avoid API calls
         attempts += 1
-        print(f"{private_key}, {address}, {balance} satoshis")
+
+        if attempts % 1000 == 0:
+            print(f"Attempts: {attempts} -> {private_key}, {address}, {balance} satoshis")
+            
 
         if is_address_match(address):
             message = f"\U0001F3AF Address match found after {attempts} attempts!\n\U0001F510 Private Key: {private_key}\n\U0001F3E6 Address: {address}\n\U0001F4B0 Balance: {balance} satoshis"
@@ -101,9 +104,6 @@ def run_puzzle():
             message = f"\U0001F4B0 Balance > 0 found after {attempts} attempts!\n\U0001F510 Private Key: {private_key}\n\U0001F3E6 Address: {address}\n\U0001F4B0 Balance: {balance} satoshis"
             send_telegram_message(message)
             save_to_json("./found/balance_matches.json", {"private_key": private_key, "address": address, "balance": balance})
-
-        if attempts % 1000 == 0:
-            print(f"Attempts: {attempts}")
 
 # Run the puzzle
 run_puzzle()
