@@ -12,7 +12,7 @@ from Crypto.Hash import RIPEMD160
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Telegram Bot Config
-TELEGRAM_BOT_TOKEN = "7413053009:"
+TELEGRAM_BOT_TOKEN = "7413053009:AAGMiHOUPW8l3i2SJERw2kQubG3ICWl6Hdo"
 TELEGRAM_CHAT_ID = "7615664261"
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -104,8 +104,7 @@ def brute_force():
         address = private_key_to_address(private_key)
         balance, _, _ = get_balance(address)
 
-        if attempts % 10000 == 0:
-            logging.info(f"Checking: {private_key} -> {address} | Balance: {balance}")
+        
 
         if address in PUZZLE_ADDRESSES or balance > 0:
             message = f"🎉 MATCH FOUND! \nPrivate Key: {private_key}\nAddress: {address}\nBalance: {balance} satoshis"
@@ -117,8 +116,9 @@ def brute_force():
             send_telegram_message(message)
 
         # Save progress every 1000 attempts
-        if attempts % 1000 == 0:
+        if attempts % 10 == 0:
             save_progress(private_key)
+            logging.info(f"Checking: {private_key} -> {address} | Balance: {balance}")
 
         attempts += 1
         current_key += 1
