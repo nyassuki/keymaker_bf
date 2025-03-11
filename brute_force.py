@@ -12,7 +12,7 @@ from Crypto.Hash import RIPEMD160
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Telegram Bot Config
-TELEGRAM_BOT_TOKEN = "7413053009:AAGMiHOUPW8l3i2SJERw2kQubG3ICWl6Hdo"
+TELEGRAM_BOT_TOKEN = "7413053009:"
 TELEGRAM_CHAT_ID = "7615664261"
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
