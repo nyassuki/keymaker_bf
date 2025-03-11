@@ -5,15 +5,29 @@ import requests
 import os
 import json
 import logging
-from telegram import Bot
+from dotenv import load_dotenv
+
+try:
+    from telegram import Bot
+except ImportError:
+    print("⚠️ python-telegram-bot is missing! Install it using: pip install python-telegram-bot")
+    exit(1)
+
 from Crypto.Hash import RIPEMD160
+
+# Load environment variables
+load_dotenv()
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Telegram Bot Config
-TELEGRAM_BOT_TOKEN = "7413053009:"
-TELEGRAM_CHAT_ID = "7615664261"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "your-default-token")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "your-default-chat-id")
+
+if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    logging.error("❌ Missing Telegram bot token or chat ID. Set them in the .env file.")
+    exit(1)
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
@@ -27,8 +41,12 @@ FOUND_FILE = "./found/found_keys.txt"
 PUZZLE_ADDRESSES_FILE = "./target_addresses.json"
 
 # Load puzzle addresses
-with open(PUZZLE_ADDRESSES_FILE, "r") as f:
-    PUZZLE_ADDRESSES = json.load(f)
+try:
+    with open(PUZZLE_ADDRESSES_FILE, "r") as f:
+        PUZZLE_ADDRESSES = set(json.load(f))  # Using a set for fast lookup
+except FileNotFoundError:
+    logging.error(f"❌ File not found: {PUZZLE_ADDRESSES_FILE}")
+    PUZZLE_ADDRESSES = set()
 
 def send_telegram_message(message):
     """Send a message to the Telegram bot."""
@@ -69,16 +87,15 @@ def get_balance(addr):
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        funded_txo_sum = data['chain_stats']['funded_txo_sum']
-        spent_txo_sum = data['chain_stats']['spent_txo_sum']
-        balance = funded_txo_sum - spent_txo_sum
-        return [balance, funded_txo_sum, spent_txo_sum]
+        funded_txo_sum = data.get("chain_stats", {}).get("funded_txo_sum", 0)
+        spent_txo_sum = data.get("chain_stats", {}).get("spent_txo_sum", 0)
+        return funded_txo_sum - spent_txo_sum  # Balance in satoshis
     except requests.exceptions.RequestException as error:
         logging.error(f"Error fetching balance for address {addr}: {error}")
-        return [0, 0, 0]
-    except KeyError as error:
-        logging.error(f"Error parsing balance data for address {addr}: {error}")
-        return [0, 0, 0]
+        return 0
+    except json.JSONDecodeError:
+        logging.error(f"Error decoding JSON response for address {addr}")
+        return 0
 
 def save_progress(last_key):
     """Save the last checked private key to progress file."""
@@ -102,12 +119,11 @@ def brute_force():
     while current_key <= END_RANGE:
         private_key = hex(current_key)[2:].zfill(64)
         address = private_key_to_address(private_key)
-        balance, _, _ = get_balance(address)
+        balance = get_balance(address)
 
-        
-
+        # Match conditions
         if address in PUZZLE_ADDRESSES or balance > 0:
-            message = f"🎉 MATCH FOUND! \nPrivate Key: {private_key}\nAddress: {address}\nBalance: {balance} satoshis"
+            message = f"🎉 MATCH FOUND!\nPrivate Key: {private_key}\nAddress: {address}\nBalance: {balance} satoshis"
             logging.info(message)
 
             with open(FOUND_FILE, "a") as f:
@@ -116,9 +132,9 @@ def brute_force():
             send_telegram_message(message)
 
         # Save progress every 1000 attempts
-        if attempts % 10 == 0:
+        if attempts % 1000 == 0:
             save_progress(private_key)
-            logging.info(f"Checking: {private_key} -> {address} | Balance: {balance}")
+            logging.info(f"🔍 Scanned: {private_key} -> {address} | Balance: {balance}")
 
         attempts += 1
         current_key += 1
